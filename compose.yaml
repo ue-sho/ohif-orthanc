@@ -4,12 +4,6 @@ services:
     restart: unless-stopped
     ports:
       - 80:80
-    # develop:
-    #   watch:
-    #     - action: sync+restart
-    #       path: ./nginx
-    #       source: ./nginx/default.conf
-    #       target: /etc/nginx/conf.d/default.conf
     depends_on:
       - orthanc-container
       - orthanc-plugin
@@ -21,12 +15,6 @@ services:
     volumes:
       - ./ohif/default-app-config.js:/usr/share/nginx/html/app-config.js
     restart: unless-stopped
-    # develop:
-    #   watch:
-    #     - action: sync+restart
-    #       path: ./ohif
-    #       source: ./ohif/default-app-config.js
-    #       target: /usr/share/nginx/html/app-config.js
     depends_on:
       - orthanc-container
 
