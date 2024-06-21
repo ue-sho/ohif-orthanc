@@ -1,0 +1,136 @@
+services:
+  nginx:
+    build: nginx
+    restart: unless-stopped
+    ports:
+      - 80:80
+    # develop:
+    #   watch:
+    #     - action: sync+restart
+    #       path: ./nginx
+    #       source: ./nginx/default.conf
+    #       target: /etc/nginx/conf.d/default.conf
+    depends_on:
+      - orthanc-container
+      - orthanc-plugin
+      - ohif
+
+  ohif:
+    build: ohif
+    # optional if you want to customize the OHIF configuration:
+    volumes:
+      - ./ohif/default-app-config.js:/usr/share/nginx/html/app-config.js
+    restart: unless-stopped
+    # develop:
+    #   watch:
+    #     - action: sync+restart
+    #       path: ./ohif
+    #       source: ./ohif/default-app-config.js
+    #       target: /usr/share/nginx/html/app-config.js
+    depends_on:
+      - orthanc-container
+
+  orthanc-container:
+    image: orthancteam/orthanc
+    restart: unless-stopped
+    volumes:
+      - ./orthanc-storage:/var/lib/orthanc/db/
+    environment:
+      ORTHANC__NAME: "OHIF in container"
+
+      DICOM_WEB_PLUGIN_ENABLED: "true"
+      ORTHANC__DICOM_WEB__PUBLIC_ROOT: "/orthanc-container/dicom-web/"
+
+      ORTHANC__ORTHANC_EXPLORER_2__UI_OPTIONS__ENABLE_OPEN_IN_OHIF_VIEWER_3: "true"
+      ORTHANC__ORTHANC_EXPLORER_2__UI_OPTIONS__OHIF_VIEWER_3_PUBLIC_ROOT: "http://localhost/ohif/"
+
+      ORTHANC__AUTHENTICATION_ENABLED: "false"
+      ORTHANC__POSTGRESQL: |
+        {
+          "Host": "orthanc-index"
+        }
+
+      VERBOSE_STARTUP: "true"
+
+      ORTHANC__AWS_S3_STORAGE__BUCKET_NAME: "ohif-orthanc-bucket"
+      ORTHANC__AWS_S3_STORAGE__REGION: "ap-northeast-1"
+      ORTHANC__AWS_S3_STORAGE__ACCESS_KEY: "minio"
+      ORTHANC__AWS_S3_STORAGE__SECRET_KEY: "miniopwd"
+      ORTHANC__AWS_S3_STORAGE__ENDPOINT: "http://minio:9000"
+      ORTHANC__AWS_S3_STORAGE__VIRTUAL_ADDRESSING: "false"
+      # ORTHANC__AWS_S3_STORAGE__HYBRID_MODE: "WriteToObjectStorage"
+      # ORTHANC__AWS_S3_STORAGE__HYBRID_MODE: "WriteToFileSystem"
+      ORTHANC__DICOM_SERVER_ENABLED: "false"
+      VERBOSE_ENABLED: "true"
+
+  orthanc-plugin:
+    image: orthancteam/orthanc
+    restart: unless-stopped
+    ports:
+      - 8053:8042
+    volumes:
+      - ./orthanc-storage:/var/lib/orthanc/db/
+    environment:
+      ORTHANC__NAME: "OHIF in plugin"
+
+      DICOM_WEB_PLUGIN_ENABLED: "true"
+      ORTHANC__DICOM_WEB__PUBLIC_ROOT: "/orthanc-plugin/dicom-web/"
+
+      ORTHANC__ORTHANC_EXPLORER_2__UI_OPTIONS__ENABLE_OPEN_IN_OHIF_VIEWER_3: "true"
+      ORTHANC__ORTHANC_EXPLORER_2__UI_OPTIONS__OHIF_VIEWER_3_PUBLIC_ROOT: "http://localhost/orthanc-plugin/ohif/"
+
+      STONE_WEB_VIEWER_PLUGIN_ENABLED: "true"
+
+      OHIF_PLUGIN_ENABLED: "true"
+      ORTHANC__OHIF: |
+        {
+          "RouterBasename": "/orthanc-plugin/ohif/",
+          "DataSource" : "dicom-web"
+        }
+
+      ORTHANC__AUTHENTICATION_ENABLED: "false"
+      ORTHANC__POSTGRESQL: |
+        {
+          "Host": "orthanc-index"
+        }
+
+      VERBOSE_STARTUP: "true"
+
+      ORTHANC__AWS_S3_STORAGE__BUCKET_NAME: "ohif-orthanc-bucket"
+      ORTHANC__AWS_S3_STORAGE__REGION: "ap-northeast-1"
+      ORTHANC__AWS_S3_STORAGE__ACCESS_KEY: "minio"
+      ORTHANC__AWS_S3_STORAGE__SECRET_KEY: "miniopwd"
+      ORTHANC__AWS_S3_STORAGE__ENDPOINT: "http://minio:9000"
+      ORTHANC__AWS_S3_STORAGE__VIRTUAL_ADDRESSING: "false"
+      # ORTHANC__AWS_S3_STORAGE__HYBRID_MODE: "WriteToObjectStorage"
+      # ORTHANC__AWS_S3_STORAGE__HYBRID_MODE: "WriteToFileSystem"
+      ORTHANC__DICOM_SERVER_ENABLED: "false"
+      VERBOSE_ENABLED: "true"
+
+  orthanc-index:
+    image: postgres:15
+    restart: unless-stopped
+    ports: ["5432:5432"]
+    volumes: ["./orthanc-index:/var/lib/postgresql/data"]
+    environment:
+      POSTGRES_HOST_AUTH_METHOD: "trust"
+
+  minio:
+      image: minio/minio:RELEASE.2024-04-06T05-26-02Z
+      environment:
+        MINIO_REGION: "ap-northeast-1"
+        MINIO_ROOT_USER: "minio"
+        MINIO_ROOT_PASSWORD: "miniopwd"
+      volumes:
+        - minio-storage:/data
+        - ./minio-storage:/data
+      entrypoint: sh
+      command: -c 'mkdir -p /data/ohif-orthanc-bucket && /usr/bin/docker-entrypoint.sh server /data'
+
+networks:
+    test:
+
+volumes:
+  orthanc-storage:
+  orthanc-index:
+  minio-storage:
